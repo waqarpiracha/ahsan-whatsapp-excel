@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d6e3f">
+<title>WhatsApp → Excel</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #f4f6f9; color: #1c2733; }
+  header { background: #0d6e3f; color: #fff; padding: 18px 16px 14px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  main { padding: 16px; max-width: 560px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 14px; padding: 18px; margin-bottom: 14px;
+          box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card h2 { margin: 0 0 10px; font-size: 16px; color: #0d6e3f; }
+  @media (min-width: 900px) {
+    main { max-width: 1060px; display: grid; grid-template-columns: 1fr 1fr;
+           gap: 16px; align-items: start; }
+    .card { margin-bottom: 0; }
+    .span2 { grid-column: 1 / -1; }
+    header h1 { font-size: 24px; }
+    .filelabel { padding: 40px 12px; }
+    .filelabel.dragover { background: #d5efdf; border-color: #0a5530; }
+  }
+  .bigbtn { display: block; width: 100%; border: none; border-radius: 12px;
+            padding: 18px; font-size: 18px; font-weight: 700; color: #fff;
+            background: #0d6e3f; margin-top: 10px; cursor: pointer; }
+  .bigbtn:active { transform: scale(.98); background: #0a5530; }
+  .bigbtn:disabled { background: #9aa7b4; cursor: default; transform: none; }
+  input[type=file] { display: none; }
+  .filelabel { display: block; width: 100%; border: 2px dashed #0d6e3f; border-radius: 12px;
+               padding: 26px 12px; text-align: center; font-size: 17px; font-weight: 600;
+               color: #0d6e3f; background: #eaf7f0; cursor: pointer; margin-bottom: 12px; }
+  .filelabel small { display: block; margin-top: 6px; font-weight: 400; font-size: 13px; color: #5a6b7c; }
+  .filelabel .fname { color: #1c2733; font-weight: 700; }
+  .radios { display: flex; gap: 18px; margin: 6px 0 2px; font-size: 15px; }
+  .radios label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  #status { font-size: 14px; color: #33414f; min-height: 20px; margin-top: 8px; }
+  #download { display: none; text-align: center; }
+  #download a { display: inline-block; margin-top: 10px; padding: 16px 28px; font-size: 18px;
+                font-weight: 700; color: #fff; background: #1e7e34; border-radius: 12px;
+                text-decoration: none; }
+  .note { font-size: 13px; color: #6b7a8a; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 3px solid #cdd7e1;
+             border-top-color: #0d6e3f; border-radius: 50%; animation: spin 0.8s linear infinite;
+             vertical-align: -3px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  ol.steps { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: #33414f; }
+  ol.steps li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>💬 → 📊 WhatsApp to Excel</h1>
+  <p>Upload the chat export + your Master Sheet, get updated Excel.</p>
+</header>
+<main>
+  <div class="card">
+    <h2>1 · Your files</h2>
+    <label class="filelabel" for="masterpick" id="dz1">📗 Your EV Master Sheet (.xlsx)
+      <small>Your current workbook — new rows are appended to it</small>
+      <small class="fname" id="mastername"></small>
+    </label>
+    <input type="file" id="masterpick" accept=".xlsx">
+    <label class="filelabel" for="chatpick" id="dz2">💬 WhatsApp chat export (.txt)
+      <small>From the group: ⋮ → More → Export chat → Without media</small>
+      <small class="fname" id="chatname"></small>
+    </label>
+    <input type="file" id="chatpick" accept=".txt">
+  </div>
+
+  <div class="card">
+    <h2>2 · Date format in the export</h2>
+    <div class="radios">
+      <label><input type="radio" name="df" value="DMY" checked> Day/Month/Year <span class="note">(25/12/2026)</span></label>
+      <label><input type="radio" name="df" value="MDY"> Month/Day/Year <span class="note">(12/25/2026)</span></label>
+    </div>
+    <p class="note">Pick what your phone's export uses. When in doubt, open the .txt and check the first date.</p>
+  </div>
+
+  <div class="card span2">
+    <h2>3 · Make the Excel</h2>
+    <button class="bigbtn" id="make">⚙️ Make my Excel</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="card span2" id="download">
+    <h2>✅ Ready</h2>
+    <p class="note" id="summary"></p>
+    <a id="dllink" href="#">⬇️ Download Excel</a>
+  </div>
+
+  <div class="card span2">
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li>Export the group chat from WhatsApp (⋮ → More → Export chat → Without media).</li>
+      <li>Upload the .txt here along with your current EV Master Sheet.</li>
+      <li>Survey reports, survey requests and installation completions become new rows — feet are converted to meters, remote sites flagged, and anything unclear lands on the <b>Review</b> sheet for your eye.</li>
+    </ol>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let masterFile = null, chatFile = null;
+
+function bindPicker(pickId, dzId, nameId, accept, setter) {
+  $(pickId).addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) { setter(f); $(nameId).textContent = '✓ ' + f.name; }
+    e.target.value = '';
+  });
+  const dz = $(dzId);
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); dz.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); dz.classList.remove('dragover');
+  }));
+  dz.addEventListener('drop', e => {
+    const f = [...(e.dataTransfer.files || [])].find(f => accept.test(f.name));
+    if (f) { setter(f); $(nameId).textContent = '✓ ' + f.name; }
+  });
+}
+bindPicker('masterpick', 'dz1', 'mastername', /\.xlsx$/i, f => masterFile = f);
+bindPicker('chatpick', 'dz2', 'chatname', /\.txt$/i, f => chatFile = f);
+
+$('make').addEventListener('click', async () => {
+  const status = t => { $('status').textContent = t; };
+  if (!masterFile) { status('❌ First pick your EV Master Sheet (.xlsx).'); return; }
+  if (!chatFile) { status('❌ Now pick the WhatsApp chat export (.txt).'); return; }
+  const df = document.querySelector('input[name=df]:checked').value;
+  const btn = $('make'); btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Reading ' + chatFile.name + '…';
+  const fd = new FormData();
+  fd.append('master', masterFile, masterFile.name);
+  fd.append('chat', chatFile, chatFile.name);
+  fd.append('date_format', df);
+  try {
+    const r = await fetch('/process', {method: 'POST', body: fd});
+    const j = await r.json();
+    if (!j.ok) { status('❌ ' + (j.error || 'Processing failed.')); }
+    else {
+      const t = j.by_type;
+      status(`✅ Done — ${j.rows} new rows (${t.survey} surveys, ${t.assign} requests, ${t.install} installs) from ${j.messages} messages. ${j.review} on the Review sheet.`);
+      $('summary').textContent = `Appended ${j.rows} rows to your Master Sheet. ${j.review} message(s) need your eye on the Review sheet.`;
+      $('dllink').href = j.download;
+      $('download').style.display = 'block';
+      $('download').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+  } catch(e) { status('❌ Could not reach server. Try again.'); }
+  finally { btn.disabled = false; btn.textContent = '⚙️ Make my Excel'; }
+});
+</script>
+</body>
+</html>
