@@ -39,6 +39,8 @@
   .radios { display: flex; gap: 18px; margin: 6px 0 2px; font-size: 15px; }
   .radios label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
   #status { font-size: 14px; color: #33414f; min-height: 20px; margin-top: 8px; }
+  #pprog { height: 10px; background: #e3e9ef; border-radius: 6px; margin-top: 12px; display: none; }
+  #pprogbar { height: 100%; width: 0%; background: #0d6e3f; border-radius: 6px; transition: width .2s; }
   #download { display: none; text-align: center; }
   #download a { display: inline-block; margin-top: 10px; padding: 16px 28px; font-size: 18px;
                 font-weight: 700; color: #fff; background: #1e7e34; border-radius: 12px;
@@ -84,6 +86,7 @@
   <div class="card span2">
     <h2>3 · Make the Excel</h2>
     <button class="bigbtn" id="make">⚙️ Make my Excel</button>
+    <div id="pprog"><div id="pprogbar"></div></div>
     <div id="status"></div>
   </div>
 
@@ -133,14 +136,39 @@ $('make').addEventListener('click', async () => {
   if (!chatFile) { status('❌ Now pick the WhatsApp chat export (.txt).'); return; }
   const df = document.querySelector('input[name=df]:checked').value;
   const btn = $('make'); btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Reading ' + chatFile.name + '…';
+  const bar = $('pprog'), fill = $('pprogbar');
+  bar.style.display = 'block'; fill.style.width = '0%';
+  btn.innerHTML = '<span class="spinner"></span>Uploading… 0%';
   const fd = new FormData();
   fd.append('master', masterFile, masterFile.name);
   fd.append('chat', chatFile, chatFile.name);
   fd.append('date_format', df);
   try {
-    const r = await fetch('/process', {method: 'POST', body: fd});
-    const j = await r.json();
+    const j = await new Promise((resolve, reject) => {
+      const x = new XMLHttpRequest();
+      x.open('POST', '/process');
+      x.timeout = 300000; // 5 min: big chat exports take a while to parse
+      x.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pc = Math.round(e.loaded / e.total * 100);
+          fill.style.width = pc + '%';
+          btn.innerHTML = '<span class="spinner"></span>Uploading… ' + pc + '%';
+        }
+      };
+      x.upload.onload = () => {
+        fill.style.width = '100%';
+        btn.innerHTML = '<span class="spinner"></span>Reading ' + chatFile.name + '… (large chats can take a minute)';
+      };
+      x.onload = () => {
+        let d = null;
+        try { d = JSON.parse(x.responseText); } catch (e) {}
+        if (x.status >= 200 && x.status < 300 && d) resolve(d);
+        else reject(new Error((d && d.error) || ('server-' + x.status)));
+      };
+      x.onerror = () => reject(new Error('network'));
+      x.ontimeout = () => reject(new Error('timeout'));
+      x.send(fd);
+    });
     if (!j.ok) { status('❌ ' + (j.error || 'Processing failed.')); }
     else {
       const t = j.by_type;
@@ -150,8 +178,17 @@ $('make').addEventListener('click', async () => {
       $('download').style.display = 'block';
       $('download').scrollIntoView({behavior: 'smooth', block: 'nearest'});
     }
-  } catch(e) { status('❌ Could not reach server. Try again.'); }
-  finally { btn.disabled = false; btn.textContent = '⚙️ Make my Excel'; }
+  } catch(e) {
+    status('❌ ' + (e.message === 'timeout'
+      ? 'Taking too long — check your connection and try again.'
+      : (e.message && e.message.indexOf('server-') === 0)
+        ? 'Server error — try again in a minute.'
+        : 'Could not reach server. Try again.'));
+  }
+  finally {
+    btn.disabled = false; btn.textContent = '⚙️ Make my Excel';
+    setTimeout(() => { bar.style.display = 'none'; }, 800);
+  }
 });
 </script>
 </body>
