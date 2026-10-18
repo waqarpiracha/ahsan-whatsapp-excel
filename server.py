@@ -96,6 +96,12 @@ def process():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+@app.get("/status")
+def status():
+    """Lightweight ping for the ↻ refresh button (wakes the free-tier server)."""
+    return jsonify({"ok": True, "service": "ahsan-whatsapp-excel"})
+
+
 @app.get("/download")
 def download():
     name = os.path.basename(request.args.get("file", ""))
