@@ -338,6 +338,7 @@ def _base_row(msg):
         "surveyor_exp": "",
         "remarks": "",
         "remote_local": "",
+        "full_message": "",
     }
 
 
@@ -506,5 +507,6 @@ def extract_rows(messages):
             continue
         stats[rtype] += 1
         row["_type"] = rtype
+        row["full_message"] = body
         rows.append(row)
     return rows, review, stats

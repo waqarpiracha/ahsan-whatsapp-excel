@@ -40,6 +40,29 @@ FINAL_GROUPS = [
 ]
 
 REVIEW_SHEET = "Review"
+COMPLETE_MESSAGE_HEADER = "Complete Message"
+
+
+def _ensure_complete_message_column(ws):
+    """Add a 'Complete Message' column after the last header (idempotent).
+
+    Appended at the end so the existing template layout and group merges
+    are untouched. Returns the 1-based column index.
+    """
+    headers = [str(ws.cell(HEADER_ROW, c).value or "").strip()
+               for c in range(1, ws.max_column + 1)]
+    if COMPLETE_MESSAGE_HEADER in headers:
+        return headers.index(COMPLETE_MESSAGE_HEADER) + 1
+    last_header_col = max(
+        (c for c in range(1, ws.max_column + 1)
+         if str(ws.cell(HEADER_ROW, c).value or "").strip()),
+        default=ws.max_column)
+    col = last_header_col + 1
+    ws.cell(HEADER_ROW, col).value = COMPLETE_MESSAGE_HEADER
+    _copy_style(ws.cell(HEADER_ROW, last_header_col),
+                ws.cell(HEADER_ROW, col))
+    ws.column_dimensions[get_column_letter(col)].width = 60
+    return col
 
 
 def _check_template(ws):
@@ -142,6 +165,7 @@ def append_rows(master_copy_path, rows, review, out_path,
     ws = wb.active
     _check_template(ws)
     _ensure_new_columns(ws)
+    cm_col = _ensure_complete_message_column(ws)
 
     date_fmt = "DD/MM/YYYY" if date_format == "DMY" else "MM/DD/YYYY"
     last = _last_data_row(ws)
@@ -177,6 +201,11 @@ def append_rows(master_copy_path, rows, review, out_path,
         ws.cell(last, COL["bore"], row["bore"])
         ws.cell(last, COL["remarks"], row["remarks"])
         ws.cell(last, COL["remote_local"], row["remote_local"])
+        cm_cell = ws.cell(last, cm_col, row.get("full_message", ""))
+        al = copy.copy(cm_cell.alignment)
+        al.wrap_text = True
+        al.vertical = "top"
+        cm_cell.alignment = al
         written += 1
 
     # clear stale pre-filled Sr. No below the new data (bare numbers whose
