@@ -42,6 +42,99 @@ FINAL_GROUPS = [
 REVIEW_SHEET = "Review"
 COMPLETE_MESSAGE_HEADER = "Complete Message"
 
+# ---------------------------------------------------------------------------
+# Final Output (invoice format) — added 2026-10-29 at Ahsan's request.
+# His returned workbook (EV_Master_2026-10-29.xlsx) carried a sheet named
+# "Final Output sheet req": one row per client activity, keyed by the
+# client's phone number. The wide master sheet stays as the quotation
+# format; this sheet is the invoice format. Headers reproduce his sheet
+# exactly (including his "Activity Detai"), in row 2, data from row 3.
+# ---------------------------------------------------------------------------
+FINAL_OUTPUT_SHEET = "Final Output"
+FINAL_OUTPUT_HEADERS = [
+    "Track ID/Client Number",
+    "Activity Status (open/close)",
+    "Date of Activity",
+    "Activity Reported Time",
+    "Activity Close Time",
+    "Activity Done Date and time",
+    "Activity Detai",
+    "Customer ID",
+]
+_FINAL_OUTPUT_GREEN = "FF92D050"  # the green his own header rows use
+
+
+def _write_final_output_sheet(wb, rows, date_format="DMY"):
+    """Build the invoice-format sheet from parsed rows.
+
+    One row per parsed activity that carries a client number. A Pending
+    activity is closed by the first later Closed activity for the same
+    client number: its Close Time / Done Date+time are taken from that
+    closing message (per Ahsan's own notes in his sample rows).
+    Customer ID mirrors Activity Detail, exactly as in his samples.
+    Returns the number of invoice rows written.
+    """
+    if FINAL_OUTPUT_SHEET in wb.sheetnames:
+        wb.remove(wb[FINAL_OUTPUT_SHEET])
+    ws = wb.create_sheet(FINAL_OUTPUT_SHEET, 1)
+
+    from openpyxl.styles import PatternFill, Font, Alignment
+    fill = PatternFill("solid", fgColor=_FINAL_OUTPUT_GREEN)
+    for c, h in enumerate(FINAL_OUTPUT_HEADERS, 1):
+        cell = ws.cell(2, c, h)
+        cell.fill = fill
+        cell.font = Font(bold=True)
+
+    date_fmt = "DD/MM/YYYY" if date_format == "DMY" else "MM/DD/YYYY"
+
+    acts = [r for r in rows if r.get("client_cell")]
+    # first closing (date, time) per client number, in chat order
+    def _close_for(idx, cell_no):
+        for later in acts[idx + 1:]:
+            if later["client_cell"] == cell_no \
+                    and later.get("status") == "Closed":
+                return later
+        return None
+
+    wrap = Alignment(wrap_text=True, vertical="top")
+    written = 0
+    for i, r in enumerate(acts):
+        out = 3 + written
+        status = r.get("status") or "Pending"
+        closer = None
+        if status == "Closed":
+            closer = r
+        else:
+            closer = _close_for(i, r["client_cell"])
+            if closer is not None:
+                status = "Closed"
+        ws.cell(out, 1, r["client_cell"])
+        ws.cell(out, 2, status)
+        dcell = ws.cell(out, 3)
+        if isinstance(r.get("date"), date):
+            dcell.value = datetime(r["date"].year, r["date"].month,
+                                   r["date"].day)
+            dcell.number_format = date_fmt
+        ws.cell(out, 4, r.get("time", ""))
+        if closer is not None:
+            ws.cell(out, 5, closer.get("time", ""))
+            if isinstance(closer.get("date"), date):
+                ws.cell(out, 6, closer["date"].strftime("%d/%m/%Y")
+                        + " " + (closer.get("time") or ""))
+            else:
+                ws.cell(out, 6, closer.get("time", ""))
+        detail = r.get("full_message", "")
+        c7 = ws.cell(out, 7, detail)
+        c7.alignment = wrap
+        c8 = ws.cell(out, 8, detail)
+        c8.alignment = wrap
+        written += 1
+
+    widths = [16, 15, 13, 14, 14, 20, 70, 70]
+    for c, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(c)].width = w
+    return written
+
 
 def _ensure_complete_message_column(ws):
     """Add a 'Complete Message' column after the last header (idempotent).
@@ -218,6 +311,8 @@ def append_rows(master_copy_path, rows, review, out_path,
         else:
             break
 
+    invoice_rows = _write_final_output_sheet(wb, rows,
+                                             date_format=date_format)
     _write_review_sheet(wb, review)
     wb.save(out_path)
-    return written, len(review)
+    return written, len(review), invoice_rows

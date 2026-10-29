@@ -212,8 +212,8 @@ $('make').addEventListener('click', async () => {
     if (!j.ok) { status('❌ ' + (j.error || 'Processing failed.')); }
     else {
       const t = j.by_type;
-      status(`✅ Done — ${j.rows} new rows (${t.survey} surveys, ${t.assign} requests, ${t.install} installs) from ${j.messages} messages. ${j.review} on the Review sheet.`);
-      $('summary').textContent = `Appended ${j.rows} rows to your Master Sheet. ${j.review} message(s) need your eye on the Review sheet.`;
+      status(`✅ Done — ${j.rows} new rows (${t.survey} surveys, ${t.assign} requests, ${t.install} installs) from ${j.messages} messages. ${j.review} on the Review sheet. ${j.invoice_rows ?? 0} activities on the Final Output (invoice) sheet.`);
+      $('summary').textContent = `Appended ${j.rows} rows to your Master Sheet and built the Final Output sheet with ${j.invoice_rows ?? 0} client activities in invoice format. ${j.review} message(s) need your eye on the Review sheet.`;
       $('dllink').href = j.download;
       $('download').style.display = 'block';
       $('download').scrollIntoView({behavior: 'smooth', block: 'nearest'});

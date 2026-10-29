@@ -76,9 +76,9 @@ def process():
         out_name = f"EV_Master_{date.today().isoformat()}.xlsx"
         out_path = os.path.join(OUTPUT_ROOT, out_name)
         try:
-            written, n_review = append_rows(master_path, rows, review,
-                                            out_path,
-                                            date_format=date_format)
+            written, n_review, n_invoice = append_rows(
+                master_path, rows, review, out_path,
+                date_format=date_format)
         except ValueError as e:
             return jsonify({"ok": False, "error": str(e)}), 400
 
@@ -89,6 +89,7 @@ def process():
             "by_type": {k: stats[k] for k in
                         ("survey", "assign", "install", "cable")},
             "review": n_review,
+            "invoice_rows": n_invoice,
             "ignored": stats["ignored"],
             "download": "/download?file=" + out_name,
         })
